@@ -1,2 +1,3 @@
 # textToImage
-Convert the text with set parameters into a png image
+
+## 将设置好参数的文字转换为你想要的图片（简单易上手）

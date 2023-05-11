@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0,user-scalable=no, minimum-sacle=1, maximum-scale=1"
+    />
+    <title>生成文字图片</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html {
+        --whiteShadow: -15px -15px 25px rgba(255, 255, 255, 0.6);
+        --blackShadow: 15px 15px 25px rgba(110, 40, 40, 0.2);
+      }
+      body {
+        width: 100vw;
+        height: 100vh;
+        padding-top: 20px;
+        background: #ddd;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+      }
+      header {
+        font-size: 40px;
+        font-weight: bold;
+        margin-bottom: 10px;
+        background-image: url(loading.gif);
+        background-position: center;
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      footer {
+        width: 100%;
+        height: 50px;
+        line-height: 50px;
+        text-align: center;
+        position: sticky;
+        bottom: 0;
+        background: #999;
+      }
+      .btns {
+        height: 50px;
+        line-height: 50px;
+      }
+      .options .opt-content {
+        position: relative;
+      }
+      .options .opt-content label {
+        display: inline-block;
+        min-width: 116px;
+        text-align: right;
+      }
+      .preview {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-width: 300px;
+        max-width: 96vw;
+        min-height: 200px;
+        border-radius: 5px;
+        overflow: auto;
+        margin-bottom: auto;
+        box-shadow: inset var(--blackShadow), inset var(--whiteShadow);
+      }
+    </style>
+  </head>
+  <body>
+    <header>文字转图片</header>
+    <div class="options">
+      <div class="opt-content">
+        <label for="text">文字内容：</label>
+        <input type="text" id="text" placeholder="请输入文字内容" />
+      </div>
+      <div class="opt-content">
+        <label for="font">字体：</label>
+        <select name="font" id="font" onchange="selectFontChange()">
+          <option value="Arial">Arial</option>
+          <option value="monospace">monospace</option>
+          <option value="cursive">cursive</option>
+          <option value="CustomFont">🍭自定义字体</option>
+        </select>
+      </div>
+      <div id="fontFileWrapper" class="opt-content" style="display: none">
+        <label for="fontFile">上传字体文件：</label>
+        <input type="file" id="fontFile" />
+      </div>
+      <div class="opt-content">
+        <label for="color">颜色：</label>
+        <select name="colorMode" id="colorMode" onchange="selectColorChange()">
+          <option value="primary" selected>单色</option>
+          <option value="gradient">渐变</option>
+        </select>
+        <input type="color" id="color" />
+      </div>
+      <div class="opt-content gradientColorWrapper" style="display: none">
+        <label for="gradientStartColor">渐变开始色：</label>
+        <input type="color" id="gradientStartColor" />
+      </div>
+      <div class="opt-content gradientColorWrapper" style="display: none">
+        <label for="gradientStartColor">渐变结束色：</label>
+        <input type="color" id="gradientEndColor" />
+      </div>
+      <div class="opt-content gradientColorWrapper" style="display: none">
+        <label for="gradientAngle">渐变角度:</label>
+        <input type="number" id="gradientAngle" min="0" max="360" value="180" />
+      </div>
+      <div class="opt-content">
+        <label for="size">文字大小：</label>
+        <input type="number" id="size" min="1" max="100" value="48" />
+      </div>
+      <div class="opt-content">
+        <label for="weight">粗细：</label>
+        <input
+          type="range"
+          id="weight"
+          min="100"
+          max="900"
+          step="100"
+          value="400"
+          list="datalist"
+          onchange="weightChange()"
+        /><span id="weightVal">400</span>
+      </div>
+      <div class="opt-content">
+        <label for="imgWidth">图片宽度：</label>
+        <input type="number" id="imgWidth" min="1" max="2048" value="400" />
+      </div>
+      <div class="opt-content">
+        <label for="imgHeight">图片高度：</label>
+        <input type="number" id="imgHeight" min="1" max="2048" value="200" />
+      </div>
+    </div>
+    <div class="btns">
+      <button onclick="generateImage()">生成图片</button>
+      <a id="downloadLink" download="text_image.png" style="display: none">
+        <button>下载图片</button>
+      </a>
+    </div>
+    <h2><img src="./text_yulan.png" alt="预览"></h2>
+    <div class="preview">
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <footer>Copyright &copy; 2023 Xavier</footer>
+    <script>
+      // 加载字体
+      function loadFont(file) {
+        let fontFile = URL.createObjectURL(file);
+        let fontFace = new FontFace("CustomFont", "url(" + fontFile + ")");
+
+        fontFace
+          .load()
+          .then(function (loadedFont) {
+            document.fonts.add(loadedFont);
+          })
+          .catch(function (err) {
+            alert("字体加载失败！", err);
+          });
+      }
+      // 字体粗细值改变
+      function weightChange() {
+        document.getElementById("weightVal").innerText =
+          document.getElementById("weight").value;
+      }
+      function generateImage() {
+        let canvas = document.getElementById("canvas");
+        let ctx = canvas.getContext("2d");
+        let text = document.getElementById("text").value; // 文字内容
+        let font = document.getElementById("font").value; // 字体
+        let color = document.getElementById("color").value; // 文字颜色
+        let gradientStartColor =
+          document.getElementById("gradientStartColor").value; // 文字渐变开始色
+        let gradientEndColor =
+          document.getElementById("gradientEndColor").value; // 文字渐变结束色
+        let gradientAngle = document.getElementById("gradientAngle").value; // 文字渐变色角度
+        let size = document.getElementById("size").value; // 文字大小
+        let weight = document.getElementById("weight").value; // 文字粗细
+        let imgWidth = document.getElementById("imgWidth").value; // 图片的宽度
+        let imgHeight = document.getElementById("imgHeight").value; // 图片高度
+
+        if (!text.trim()) {
+          alert("请输入文字内容");
+          return;
+        }
+        canvas.width = parseInt(imgWidth);
+        canvas.height = parseInt(imgHeight);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font =
+          weight +
+          " " +
+          size +
+          "px " +
+          (fontFileInput.value ? "CustomFont" : font);
+
+        if (document.getElementById("colorMode").value === "gradient") {
+          // 创建渐变
+
+          let angleInRadians = gradientAngle * (Math.PI / 180);
+          let startPointX =
+            canvas.width / 2 + (Math.cos(angleInRadians) * canvas.width) / 2;
+          let startPointY =
+            canvas.height / 2 + (Math.sin(angleInRadians) * canvas.height) / 2;
+          let endPointX =
+            canvas.width / 2 - (Math.cos(angleInRadians) * canvas.width) / 2;
+          let endPointY =
+            canvas.height / 2 - (Math.sin(angleInRadians) * canvas.height) / 2;
+          let gradient = ctx.createLinearGradient(
+            startPointX,
+            startPointY,
+            endPointX,
+            endPointY
+          );
+
+          gradient.addColorStop(0, gradientStartColor);
+          gradient.addColorStop(1, gradientEndColor);
+          ctx.fillStyle = gradient;
+        } else {
+          ctx.fillStyle = color;
+        }
+
+        let textWidth = ctx.measureText(text).width;
+        let x = (canvas.width - textWidth) / 2; // 水平居中
+        let y = canvas.height / 2 + parseInt(size) / 2; // 垂直居中
+
+        ctx.fillText(text, x, y);
+
+        canvas.style.backgroundColor = "rgba(0,0,0,0)";
+
+        let downloadLink = document.getElementById("downloadLink");
+        let linkHref = canvas.toDataURL("image/png");
+        downloadLink.href = linkHref;
+        downloadLink.style.display = "inline-block";
+      }
+
+      let fontFileInput = document.getElementById("fontFile");
+      fontFileInput.addEventListener("change", function (e) {
+        let file = e.target.files[0];
+        if (file) {
+          loadFont(file);
+        }
+      });
+      // 字体选择变化
+      function selectFontChange() {
+        if (document.getElementById("font").value === "CustomFont") {
+          document.getElementById("fontFileWrapper").style.display = "block";
+        } else {
+          document.getElementById("fontFileWrapper").style.display = "none";
+        }
+      }
+      // 字体颜色变化
+      function selectColorChange() {
+        if (document.getElementById("colorMode").value === "gradient") {
+          document.getElementById("color").style.display = "none";
+          document.querySelectorAll(".gradientColorWrapper").forEach(el => {
+            el.style.display = "block";
+          })
+        } else {
+          document.getElementById("color").style.display = "inline-block";
+          document.querySelectorAll(".gradientColorWrapper").forEach(el => {
+            el.style.display = "none";
+          })
+        }
+      }
+    </script>
+  </body>
+</html>
